@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { FilterHeader } from "./filter-header"
 import { ColumnSelector, type Column } from "./column-selector"
+import { ColumnFilters } from "./column-filters"
 import { PivotTable } from "./pivot-table"
 import { ChartVisualization } from "./chart-visualization"
 
@@ -106,6 +107,7 @@ const availableColumns: Column[] = [
 
 export function DynamicPivotTable() {
   const [currentData, setCurrentData] = useState(sampleData)
+  const [filteredData, setFilteredData] = useState(sampleData)
   const [rowColumns, setRowColumns] = useState<Column[]>([availableColumns[0]]) // Departamento
   const [colColumns, setColColumns] = useState<Column[]>([availableColumns[4]]) // Formulario
   const [valueColumns, setValueColumns] = useState<Column[]>([availableColumns[11]]) // Total General
@@ -114,6 +116,26 @@ export function DynamicPivotTable() {
     console.log("[v0] Filtros seleccionados:", filters)
     // Los filtros se guardan pero no se aplican automáticamente
     // Esta función se usará después para cargar datos desde la API
+  }
+
+  const handleColumnFiltersChange = (filters: Record<string, string[]>) => {
+    console.log("[v0] Filtros por columna:", filters)
+
+    if (Object.keys(filters).length === 0) {
+      // Sin filtros, mostrar todos los datos
+      setFilteredData(currentData)
+      return
+    }
+
+    // Aplicar filtros
+    const filtered = currentData.filter((item) => {
+      return Object.entries(filters).every(([columnKey, values]) => {
+        const itemValue = String(item[columnKey] || "")
+        return values.includes(itemValue)
+      })
+    })
+
+    setFilteredData(filtered)
   }
 
   const handleColumnsChange = (type: string, columns: Column[]) => {
@@ -149,9 +171,17 @@ export function DynamicPivotTable() {
         onReset={handleReset}
       />
 
-      <PivotTable data={currentData} rowColumns={rowColumns} colColumns={colColumns} valueColumns={valueColumns} />
+      <ColumnFilters
+        data={currentData}
+        rowColumns={rowColumns}
+        colColumns={colColumns}
+        valueColumns={valueColumns}
+        onFiltersChange={handleColumnFiltersChange}
+      />
 
-      <ChartVisualization data={currentData} rowColumns={rowColumns} valueColumns={valueColumns} />
+      <PivotTable data={filteredData} rowColumns={rowColumns} colColumns={colColumns} valueColumns={valueColumns} />
+
+      <ChartVisualization data={filteredData} rowColumns={rowColumns} valueColumns={valueColumns} />
     </div>
   )
 }

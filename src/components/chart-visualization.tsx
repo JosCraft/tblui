@@ -27,23 +27,33 @@ interface ChartVisualizationProps {
 
 export function ChartVisualization({ data, rowColumns, valueColumns }: ChartVisualizationProps) {
   const chartData = useMemo(() => {
-    if (rowColumns.length === 0 || valueColumns.length === 0) return []
+    if (rowColumns.length === 0 || valueColumns.length === 0 || !valueColumns.every((col) => col && col.id)) return []
 
     const aggregated: { [key: string]: any } = {}
 
     data.forEach((row) => {
-      const key = rowColumns.length > 0 ? rowColumns.map((col) => row[col.id]).join(" - ") : "Total"
+      const key =
+        rowColumns.length > 0
+          ? rowColumns
+              .filter((col) => col && col.id)
+              .map((col) => row[col.id])
+              .join(" - ")
+          : "Total"
 
       if (!aggregated[key]) {
         aggregated[key] = { name: key }
-        valueColumns.forEach((col) => {
-          aggregated[key][col.id] = 0
-        })
+        valueColumns
+          .filter((col) => col && col.id)
+          .forEach((col) => {
+            aggregated[key][col.id] = 0
+          })
       }
 
-      valueColumns.forEach((col) => {
-        aggregated[key][col.id] += Number(row[col.id]) || 0
-      })
+      valueColumns
+        .filter((col) => col && col.id)
+        .forEach((col) => {
+          aggregated[key][col.id] += Number(row[col.id]) || 0
+        })
     })
 
     return Object.values(aggregated)
@@ -68,6 +78,8 @@ export function ChartVisualization({ data, rowColumns, valueColumns }: ChartVisu
       </Card>
     )
   }
+
+  const validValueColumns = valueColumns.filter((col) => col && col.id && col.name)
 
   return (
     <Card>
@@ -95,104 +107,110 @@ export function ChartVisualization({ data, rowColumns, valueColumns }: ChartVisu
           </TabsList>
 
           <TabsContent value="bar" className="mt-6">
-            <ChartContainer
-              config={{
-                ...Object.fromEntries(
-                  valueColumns.map((col, index) => [
-                    col.id,
-                    {
-                      label: col.name,
-                      color: colors[index % colors.length],
-                    },
-                  ]),
-                ),
-              }}
-              className="h-[400px]"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  {valueColumns.map((col, index) => (
-                    <Bar key={col.id} dataKey={col.id} fill={colors[index % colors.length]} name={col.name} />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <div className="w-full overflow-hidden">
+              <ChartContainer
+                config={{
+                  ...Object.fromEntries(
+                    validValueColumns.map((col, index) => [
+                      col.id,
+                      {
+                        label: col.name,
+                        color: colors[index % colors.length],
+                      },
+                    ]),
+                  ),
+                }}
+                className="h-[400px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    {validValueColumns.map((col, index) => (
+                      <Bar key={col.id} dataKey={col.id} fill={colors[index % colors.length]} name={col.name} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
           </TabsContent>
 
           <TabsContent value="pie" className="mt-6">
-            <ChartContainer
-              config={{
-                ...Object.fromEntries(
-                  chartData.map((item, index) => [
-                    item.name,
-                    {
-                      label: item.name,
-                      color: colors[index % colors.length],
-                    },
-                  ]),
-                ),
-              }}
-              className="h-[400px]"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData.map((item, index) => ({
-                      name: item.name,
-                      value: valueColumns.reduce((sum, col) => sum + (item[col.id] || 0), 0),
-                      fill: colors[index % colors.length],
-                    }))}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={120}
-                    fill="#8884d8"
-                    dataKey="value"
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <div className="w-full overflow-hidden">
+              <ChartContainer
+                config={{
+                  ...Object.fromEntries(
+                    chartData.map((item, index) => [
+                      item.name,
+                      {
+                        label: item.name,
+                        color: colors[index % colors.length],
+                      },
+                    ]),
+                  ),
+                }}
+                className="h-[400px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                    <Pie
+                      data={chartData.map((item, index) => ({
+                        name: item.name,
+                        value: validValueColumns.reduce((sum, col) => sum + (item[col.id] || 0), 0),
+                        fill: colors[index % colors.length],
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={120}
+                      fill="#8884d8"
+                      dataKey="value"
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
           </TabsContent>
 
           <TabsContent value="line" className="mt-6">
-            <ChartContainer
-              config={{
-                ...Object.fromEntries(
-                  valueColumns.map((col, index) => [
-                    col.id,
-                    {
-                      label: col.name,
-                      color: colors[index % colors.length],
-                    },
-                  ]),
-                ),
-              }}
-              className="h-[400px]"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  {valueColumns.map((col, index) => (
-                    <Line
-                      key={col.id}
-                      type="monotone"
-                      dataKey={col.id}
-                      stroke={colors[index % colors.length]}
-                      strokeWidth={2}
-                      name={col.name}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
+            <div className="w-full overflow-hidden">
+              <ChartContainer
+                config={{
+                  ...Object.fromEntries(
+                    validValueColumns.map((col, index) => [
+                      col.id,
+                      {
+                        label: col.name,
+                        color: colors[index % colors.length],
+                      },
+                    ]),
+                  ),
+                }}
+                className="h-[400px] w-full"
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    {validValueColumns.map((col, index) => (
+                      <Line
+                        key={col.id}
+                        type="monotone"
+                        dataKey={col.id}
+                        stroke={colors[index % colors.length]}
+                        strokeWidth={2}
+                        name={col.name}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
           </TabsContent>
         </Tabs>
       </CardContent>

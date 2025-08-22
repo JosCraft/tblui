@@ -35,6 +35,13 @@ interface ColumnGroup {
   }>
 }
 
+interface Header {
+  name: string
+  accessor: string
+  colSpan: number
+  children?: Header[]
+}
+
 export function PivotTable({ data, rowColumns, colColumns, valueColumns }: PivotTableProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
@@ -50,36 +57,141 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
     })
   }
 
-  const { tableData, columnGroups } = useMemo(() => {
-    if (data.length === 0) return { tableData: [], columnGroups: [] }
+  const { tableData, columnGroups, columnHeaders } = useMemo(() => {
+    if (data.length === 0) return { tableData: [], columnGroups: [], columnHeaders: [] }
 
-    const colGroups: ColumnGroup[] = []
+    console.log("[v0] Datos recibidos:", data.length, "registros")
+    console.log(
+      "[v0] Columnas de fila:",
+      rowColumns.map((c) => c.name),
+    )
+    console.log(
+      "[v0] Columnas de columna:",
+      colColumns.map((c) => c.name),
+    )
+    console.log(
+      "[v0] Columnas de valor:",
+      valueColumns.map((c) => c.name),
+    )
 
-    if (colColumns.length > 0) {
-      const colValues = [...new Set(data.map((row) => colColumns.map((col) => row[col.id]).join(" | ")))].sort()
+    const createColumnHierarchy = () => {
+      if (colColumns.length === 0) {
+        return {
+          groups: [
+            {
+              id: "total",
+              name: "Total",
+              children: valueColumns.map((valCol) => ({
+                id: valCol.id,
+                name: valCol.name,
+                accessor: valCol.id,
+              })),
+            },
+          ],
+          headers: [valueColumns.map((col) => ({ name: col.name, accessor: col.id, colSpan: 1 }))],
+        }
+      }
 
-      colValues.forEach((colVal) => {
-        colGroups.push({
-          id: colVal,
-          name: colVal,
-          children: valueColumns.map((valCol) => ({
-            id: `${colVal}_${valCol.id}`,
-            name: valCol.name,
-            accessor: `${colVal}_${valCol.id}`,
-          })),
+      // Crear todas las combinaciones únicas de valores de columnas
+      const columnCombinations = new Map()
+
+      data.forEach((row) => {
+        let currentLevel = columnCombinations
+        const path = []
+
+        colColumns.forEach((col, index) => {
+          const value = row[col.id]
+          path.push(value)
+
+          if (!currentLevel.has(value)) {
+            currentLevel.set(value, {
+              value,
+              path: [...path],
+              children: new Map(),
+              level: index,
+            })
+          }
+
+          currentLevel = currentLevel.get(value).children
         })
       })
-    } else {
-      colGroups.push({
-        id: "total",
-        name: "Total",
-        children: valueColumns.map((valCol) => ({
-          id: valCol.id,
-          name: valCol.name,
-          accessor: valCol.id,
-        })),
-      })
+
+      // Convertir la estructura en grupos de columnas planos
+      const flattenColumnGroups = (map, level = 0, parentPath = []) => {
+        const groups = []
+
+        map.forEach((item, key) => {
+          const currentPath = [...parentPath, key]
+
+          if (level === colColumns.length - 1) {
+            // Último nivel - crear columnas para cada valor
+            groups.push({
+              id: currentPath.join(" | "),
+              name: key,
+              path: currentPath,
+              children: valueColumns.map((valCol) => ({
+                id: `${currentPath.join("_")}_${valCol.id}`,
+                name: valCol.name,
+                accessor: `${currentPath.join("_")}_${valCol.id}`,
+                path: currentPath,
+              })),
+            })
+          } else {
+            // Niveles intermedios - continuar recursión
+            const childGroups = flattenColumnGroups(item.children, level + 1, currentPath)
+            groups.push(...childGroups)
+          }
+        })
+
+        return groups
+      }
+
+      // Crear encabezados jerárquicos
+      const createHeaders = (map, level = 0, parentPath = []) => {
+        const headers = []
+
+        map.forEach((item, key) => {
+          const currentPath = [...parentPath, key]
+
+          if (level === colColumns.length - 1) {
+            // Último nivel
+            headers.push({
+              name: key,
+              path: currentPath,
+              colSpan: valueColumns.length,
+              children: valueColumns.map((valCol) => ({
+                name: valCol.name,
+                accessor: `${currentPath.join("_")}_${valCol.id}`,
+                colSpan: 1,
+              })),
+            })
+          } else {
+            // Calcular colSpan basado en los hijos
+            const childHeaders = createHeaders(item.children, level + 1, currentPath)
+            const totalColSpan = childHeaders.reduce((sum, child) => sum + (child.colSpan || 1), 0)
+
+            headers.push({
+              name: key,
+              path: currentPath,
+              colSpan: totalColSpan,
+              children: childHeaders,
+            })
+          }
+        })
+
+        return headers
+      }
+
+      const groups = flattenColumnGroups(columnCombinations)
+      const headerStructure = createHeaders(columnCombinations)
+
+      console.log("[v0] Grupos de columnas creados:", groups.length)
+      console.log("[v0] Estructura de encabezados:", headerStructure)
+
+      return { groups, headers: headerStructure }
     }
+
+    const { groups: colGroups, headers: columnHeaderStructure } = createColumnHierarchy()
 
     const createHierarchicalData = (columnGroups: ColumnGroup[]): GroupedRow[] => {
       if (rowColumns.length === 0) {
@@ -282,8 +394,78 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
       }
     }
 
-    return { tableData: createHierarchicalData(colGroups), columnGroups: colGroups }
+    return {
+      tableData: createHierarchicalData(colGroups),
+      columnGroups: colGroups,
+      columnHeaders: columnHeaderStructure,
+    }
   }, [data, rowColumns, colColumns, valueColumns, expandedGroups])
+
+  const renderColumnHeaders = () => {
+    if (colColumns.length === 0) {
+      return (
+        <tr>
+          <th className="border bg-primary text-primary-foreground p-2 text-left font-semibold">
+            {rowColumns.length > 0 ? rowColumns.map((col) => col.name).join(" / ") : "Datos"}
+          </th>
+          {valueColumns.map((col) => (
+            <th key={col.id} className="border bg-primary text-primary-foreground p-2 text-center font-semibold">
+              {col.name}
+            </th>
+          ))}
+        </tr>
+      )
+    }
+
+    const renderHeaderLevel = (headers, level = 0) => {
+      return (
+        <tr>
+          {level === 0 && (
+            <th
+              rowSpan={colColumns.length + 1}
+              className="border bg-primary text-primary-foreground p-2 text-left font-semibold"
+            >
+              {rowColumns.length > 0 ? rowColumns.map((col) => col.name).join(" / ") : "Datos"}
+            </th>
+          )}
+          {headers.map((header, index) => (
+            <th
+              key={`${level}_${index}`}
+              colSpan={header.colSpan}
+              className={`border p-2 text-center font-semibold ${
+                level === 0
+                  ? "bg-primary text-primary-foreground"
+                  : level === 1
+                    ? "bg-secondary text-secondary-foreground"
+                    : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {header.name}
+            </th>
+          ))}
+        </tr>
+      )
+    }
+
+    const getAllLevels = (headers, currentLevel = 0, allLevels = []) => {
+      if (!allLevels[currentLevel]) {
+        allLevels[currentLevel] = []
+      }
+
+      headers.forEach((header) => {
+        allLevels[currentLevel].push(header)
+        if (header.children && header.children.length > 0) {
+          getAllLevels(header.children, currentLevel + 1, allLevels)
+        }
+      })
+
+      return allLevels
+    }
+
+    const allLevels = getAllLevels(columnHeaders)
+
+    return allLevels.map((levelHeaders, level) => renderHeaderLevel(levelHeaders, level))
+  }
 
   return (
     <Card>
@@ -299,39 +481,7 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  {columnGroups.length > 1 && (
-                    <tr className="bg-blue-200">
-                      {rowColumns.length > 0 && (
-                        <th key="hierarchy" className="border border-gray-300 p-2 text-left font-semibold">
-                          {rowColumns.map((col) => col.name).join(" / ")}
-                        </th>
-                      )}
-                      {columnGroups.map((colGroup) => (
-                        <th
-                          key={colGroup.id}
-                          colSpan={colGroup.children.length}
-                          className="border border-gray-300 p-2 text-center font-semibold bg-blue-300"
-                        >
-                          {colGroup.name}
-                        </th>
-                      ))}
-                    </tr>
-                  )}
-
-                  <tr className="bg-blue-100">
-                    <th className="border border-gray-300 p-2 text-left font-semibold">
-                      {rowColumns.length > 0 ? rowColumns.map((col) => col.name).join(" / ") : "Datos"}
-                    </th>
-                    {columnGroups.map((colGroup) =>
-                      colGroup.children.map((col) => (
-                        <th key={col.id} className="border border-gray-300 p-2 text-center font-semibold">
-                          {col.name}
-                        </th>
-                      )),
-                    )}
-                  </tr>
-                </thead>
+                <thead>{renderColumnHeaders()}</thead>
                 <tbody>
                   {tableData.map((rowData, index) => {
                     const hasExpandableChildren =
@@ -345,22 +495,24 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
                     return (
                       <tr
                         key={rowData.id}
-                        className={`border-b hover:bg-gray-50 ${
-                          isSubtotal
-                            ? "bg-blue-200 font-bold border-t-2 border-blue-400"
-                            : rowData.isGroup
-                              ? "bg-blue-50"
-                              : ""
-                        } ${rowData.id === "total_row" ? "bg-green-100 font-bold border-t-2 border-green-500" : ""}`}
+                        className={`border-b hover:bg-muted/50 ${
+                          isSubtotal ? "font-bold border-t-2" : rowData.isGroup ? "" : ""
+                        } ${rowData.id === "total_row" ? "font-bold border-t-2" : ""}`}
                       >
-                        <td className="border border-gray-300 p-2">
+                        <td
+                          className={`border p-2 ${
+                            rowData.id === "total_row"
+                              ? "bg-accent text-accent-foreground"
+                              : isSubtotal
+                                ? "bg-secondary text-secondary-foreground"
+                                : rowData.isGroup && rowData.level === 0
+                                  ? "bg-muted text-muted-foreground"
+                                  : ""
+                          }`}
+                        >
                           <div
                             className={`flex items-center gap-2 ${
-                              isSubtotal
-                                ? "font-semibold bg-blue-200 border-t-2 border-blue-400"
-                                : rowData.isGroup
-                                  ? "font-semibold bg-blue-100"
-                                  : ""
+                              isSubtotal ? "font-semibold" : rowData.isGroup ? "font-semibold" : ""
                             }`}
                             style={{ paddingLeft: `${rowData.level * 20}px` }}
                           >
@@ -386,13 +538,24 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
                           colGroup.children.map((col) => {
                             const value = rowData.data[col.accessor] || 0
                             const cellClass = isSubtotal
-                              ? "text-right font-mono bg-blue-200 font-bold border-t-2 border-blue-400"
+                              ? "text-right font-mono font-bold"
                               : rowData.isGroup
-                                ? "bg-blue-100 font-semibold text-right font-mono"
+                                ? "font-semibold text-right font-mono"
                                 : "text-right font-mono"
 
                             return (
-                              <td key={col.id} className="border border-gray-300 p-2">
+                              <td
+                                key={col.id}
+                                className={`border p-2 ${
+                                  rowData.id === "total_row"
+                                    ? "bg-accent text-accent-foreground"
+                                    : isSubtotal
+                                      ? "bg-secondary text-secondary-foreground"
+                                      : rowData.isGroup && rowData.level === 0
+                                        ? "bg-muted text-muted-foreground"
+                                        : ""
+                                }`}
+                              >
                                 <div className={cellClass}>{value.toLocaleString()}</div>
                               </td>
                             )
