@@ -6,20 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-
-interface Column {
-  id: string
-  name: string
-  type: "dimension" | "measure"
-}
-
-interface ColumnFiltersProps {
-  data: any[]
-  rowColumns: Column[]
-  colColumns: Column[]
-  valueColumns: Column[]
-  onFiltersChange: (filters: Record<string, string[]>) => void
-}
+import type { ColumnFiltersProps } from "@/interfaces/column-filters"
 
 export function ColumnFilters({ data, rowColumns, colColumns, valueColumns, onFiltersChange }: ColumnFiltersProps) {
   const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({})

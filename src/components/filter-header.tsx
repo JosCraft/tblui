@@ -5,20 +5,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Loader2 } from "lucide-react"
-import { useDepartamentos, useFormularios, useVariables } from "@/hooks/useFilterData"
-
-interface FilterHeaderProps {
-  onFiltersChange: (filters: { departamento: string; formulario: string; variable: string }) => void
-}
+import { useDepartamentos, useFormularios } from "@/hooks/useFilterData"
+import { useGruposByFormularioQuery } from "@/hooks/queries"
+import type { FilterHeaderProps } from "@/interfaces/filter-header"
 
 export function FilterHeader({ onFiltersChange }: FilterHeaderProps) {
   const [departamento, setDepartamento] = useState("")
   const [formulario, setFormulario] = useState("")
-  const [variable, setVariable] = useState("")
+  const [grupo, setGrupo] = useState("")
 
   const { departamentos, loading: loadingDepartamentos, error: errorDepartamentos } = useDepartamentos()
   const { formularios, loading: loadingFormularios, error: errorFormularios } = useFormularios()
-  const { variables, loading: loadingVariables, error: errorVariables } = useVariables()
+  
+  // Convertir formulario string a number para la query
+  const formularioId = formulario ? parseInt(formulario) : undefined
+  const { data: grupos, isLoading: loadingGrupos, error: errorGruposQuery } = useGruposByFormularioQuery(formularioId)
+  
+  const errorGrupos = errorGruposQuery ? 'Error al cargar grupos' : null
 
   const handleDepartamentoChange = (value: string) => {
     setDepartamento(value)
@@ -26,10 +29,13 @@ export function FilterHeader({ onFiltersChange }: FilterHeaderProps) {
 
   const handleFormularioChange = (value: string) => {
     setFormulario(value)
+    // Limpiar grupo cuando cambia el formulario
+    setGrupo("")
   }
 
   const handleGetData = () => {
-    onFiltersChange({ departamento, formulario, variable })
+    // Mapear grupo a variable para mantener compatibilidad con la interfaz existente
+    onFiltersChange({ departamento, formulario, variable: grupo })
   }
 
   return (
@@ -66,7 +72,7 @@ export function FilterHeader({ onFiltersChange }: FilterHeaderProps) {
                 <SelectValue placeholder={loadingFormularios ? "Cargando..." : "Seleccionar formulario"} />
               </SelectTrigger>
               <SelectContent>
-                {formularios.map((form) => (
+{(formularios || []).map((form) => (
                   <SelectItem key={form.id} value={form.id}>
                     {form.nombre}
                   </SelectItem>
@@ -77,28 +83,34 @@ export function FilterHeader({ onFiltersChange }: FilterHeaderProps) {
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm font-medium">Variable</label>
-            <Select value={variable} onValueChange={setVariable}>
+            <label className="text-sm font-medium">Grupo</label>
+            <Select value={grupo} onValueChange={setGrupo} disabled={!formulario}>
               <SelectTrigger>
-                <SelectValue placeholder={loadingVariables ? "Cargando..." : "Seleccionar variable"} />
+                <SelectValue placeholder={
+                  !formulario 
+                    ? "Seleccionar formulario primero" 
+                    : loadingGrupos 
+                    ? "Cargando..." 
+                    : "Seleccionar grupo"
+                } />
               </SelectTrigger>
               <SelectContent>
-                {variables.map((var_item) => (
-                  <SelectItem key={var_item.id} value={var_item.id}>
-                    {var_item.nombre}
+                {(grupos || []).map((grupo_item) => (
+                  <SelectItem key={grupo_item.id_grupo} value={grupo_item.id_grupo}>
+                    {grupo_item.nombre_grupo}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {errorVariables && <p className="text-sm text-destructive">{errorVariables}</p>}
+            {errorGrupos && <p className="text-sm text-destructive">{errorGrupos}</p>}
           </div>
 
           <Button
             onClick={handleGetData}
-            disabled={loadingDepartamentos || loadingFormularios || loadingVariables}
+            disabled={loadingDepartamentos || loadingFormularios || loadingGrupos}
             className="w-full"
           >
-            {(loadingDepartamentos || loadingFormularios || loadingVariables) && (
+            {(loadingDepartamentos || loadingFormularios || loadingGrupos) && (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             )}
             Obtener Datos

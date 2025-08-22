@@ -1,58 +1,17 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { apiService, type DepartamentoResponse, type FormularioResponse, type VariableResponse } from "@/services/api"
+import { apiService, type VariableResponse } from "@/services/api"
+import { useDepartamentosQuery, useFormulariosQuery } from "@/hooks/queries"
 
 export function useDepartamentos() {
-  const [departamentos, setDepartamentos] = useState<DepartamentoResponse[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const fetchDepartamentos = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await apiService.getDepartamentos()
-        setDepartamentos(data)
-      } catch (err) {
-        setError("Error al cargar departamentos")
-        console.error("[v0] Error in useDepartamentos:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchDepartamentos()
-  }, [])
-
-  return { departamentos, loading, error }
+  const { data, isLoading, error } = useDepartamentosQuery()
+  return { departamentos: data ?? [], loading: isLoading, error: error ? 'Error al cargar departamentos' : null }
 }
 
 export function useFormularios() {
-  const [formularios, setFormularios] = useState<FormularioResponse[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const fetchFormularios = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const data = await apiService.getFormularios()
-        setFormularios(data)
-      } catch (err) {
-        setError("Error al cargar formularios")
-        console.error("[v0] Error in useFormularios:", err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchFormularios()
-  }, [])
-
-  return { formularios, loading, error }
+  const { data, isLoading, error } = useFormulariosQuery()
+  return { formularios: data ?? [], loading: isLoading, error: error ? 'Error al cargar formularios' : null }
 }
 
 export function useVariables() {

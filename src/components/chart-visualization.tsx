@@ -17,13 +17,7 @@ import {
 } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { TrendingUp, BarChart3, PieChartIcon, LineChartIcon } from "lucide-react"
-import type { Column } from "./column-selector"
-
-interface ChartVisualizationProps {
-  data: any[]
-  rowColumns: Column[]
-  valueColumns: Column[]
-}
+import type { ChartVisualizationProps } from "@/interfaces/chart-visualization"
 
 export function ChartVisualization({ data, rowColumns, valueColumns }: ChartVisualizationProps) {
   const chartData = useMemo(() => {

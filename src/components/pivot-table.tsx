@@ -4,43 +4,7 @@ import { useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRightIcon } from "lucide-react"
-import type { Column } from "./column-selector"
-
-interface PivotTableProps {
-  data: any[]
-  rowColumns: Column[]
-  colColumns: Column[]
-  valueColumns: Column[]
-}
-
-interface GroupedRow {
-  id: string
-  level: number
-  isGroup: boolean
-  isExpanded: boolean
-  groupKey: string
-  groupValue: string
-  children?: GroupedRow[]
-  data: Record<string, any>
-  parentId?: string
-}
-
-interface ColumnGroup {
-  id: string
-  name: string
-  children: Array<{
-    id: string
-    name: string
-    accessor: string
-  }>
-}
-
-interface Header {
-  name: string
-  accessor: string
-  colSpan: number
-  children?: Header[]
-}
+import type { PivotTableProps, GroupedRow, ColumnGroup, Header } from "@/interfaces/pivot-table"
 
 export function PivotTable({ data, rowColumns, colColumns, valueColumns }: PivotTableProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -74,9 +38,9 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
       valueColumns.map((c) => c.name),
     )
 
-    const createColumnHierarchy = () => {
+const createColumnHierarchy = (): { groups: ColumnGroup[]; headers: Header[] } => {
       if (colColumns.length === 0) {
-        return {
+return {
           groups: [
             {
               id: "total",
@@ -88,16 +52,18 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
               })),
             },
           ],
-          headers: [valueColumns.map((col) => ({ name: col.name, accessor: col.id, colSpan: 1 }))],
+          headers: [],
         }
       }
 
       // Crear todas las combinaciones únicas de valores de columnas
-      const columnCombinations = new Map()
+type ColumnNode = { value: string; path: string[]; children: Map<string, ColumnNode>; level: number }
+
+const columnCombinations: Map<string, ColumnNode> = new Map()
 
       data.forEach((row) => {
         let currentLevel = columnCombinations
-        const path = []
+const path: string[] = []
 
         colColumns.forEach((col, index) => {
           const value = row[col.id]
@@ -112,28 +78,26 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
             })
           }
 
-          currentLevel = currentLevel.get(value).children
+currentLevel = currentLevel.get(value)!.children
         })
       })
 
       // Convertir la estructura en grupos de columnas planos
-      const flattenColumnGroups = (map, level = 0, parentPath = []) => {
-        const groups = []
+const flattenColumnGroups = (map: Map<string, ColumnNode>, level = 0, parentPath: string[] = []): ColumnGroup[] => {
+const groups: ColumnGroup[] = []
 
         map.forEach((item, key) => {
           const currentPath = [...parentPath, key]
 
           if (level === colColumns.length - 1) {
             // Último nivel - crear columnas para cada valor
-            groups.push({
+groups.push({
               id: currentPath.join(" | "),
               name: key,
-              path: currentPath,
               children: valueColumns.map((valCol) => ({
                 id: `${currentPath.join("_")}_${valCol.id}`,
                 name: valCol.name,
                 accessor: `${currentPath.join("_")}_${valCol.id}`,
-                path: currentPath,
               })),
             })
           } else {
@@ -147,17 +111,17 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
       }
 
       // Crear encabezados jerárquicos
-      const createHeaders = (map, level = 0, parentPath = []) => {
-        const headers = []
+const createHeaders = (map: Map<string, ColumnNode>, level = 0, parentPath: string[] = []): Header[] => {
+const headers: Header[] = []
 
-        map.forEach((item, key) => {
+map.forEach((item: ColumnNode, key: string) => {
           const currentPath = [...parentPath, key]
 
           if (level === colColumns.length - 1) {
             // Último nivel
-            headers.push({
+headers.push({
               name: key,
-              path: currentPath,
+              accessor: `${currentPath.join("_")}_GROUP`,
               colSpan: valueColumns.length,
               children: valueColumns.map((valCol) => ({
                 name: valCol.name,
@@ -167,12 +131,12 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
             })
           } else {
             // Calcular colSpan basado en los hijos
-            const childHeaders = createHeaders(item.children, level + 1, currentPath)
+const childHeaders: Header[] = createHeaders(item.children, level + 1, currentPath)
             const totalColSpan = childHeaders.reduce((sum, child) => sum + (child.colSpan || 1), 0)
 
-            headers.push({
+headers.push({
               name: key,
-              path: currentPath,
+              accessor: `${currentPath.join("_")}_GROUP`,
               colSpan: totalColSpan,
               children: childHeaders,
             })
@@ -257,7 +221,7 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
                 if (colColumns.length > 0) {
                   const colKey = colColumns.map((c) => row[c.id]).join(" | ")
                   if (colKey === colGroup.id) {
-                    const valColId = col.accessor.split("_").pop()
+const valColId = col.accessor.split("_").pop() as string
                     total += Number.parseFloat(row[valColId]) || 0
                   }
                 } else {
@@ -310,7 +274,7 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
                     if (colColumns.length > 0) {
                       const colKey = colColumns.map((c) => row[c.id]).join(" | ")
                       if (colKey === colGroup.id) {
-                        const valColId = col.accessor.split("_").pop()
+const valColId = col.accessor.split("_").pop() as string
                         rowTotals[accessor] = Number.parseFloat(row[valColId]) || 0
                       } else {
                         rowTotals[accessor] = 0
@@ -371,7 +335,7 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
             if (colColumns.length > 0) {
               const colKey = colColumns.map((c) => row[c.id]).join(" | ")
               if (colKey === colGroup.id) {
-                const valColId = col.accessor.split("_").pop()
+const valColId = col.accessor.split("_").pop() as string
                 total += Number.parseFloat(row[valColId]) || 0
               }
             } else {
@@ -417,7 +381,7 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
       )
     }
 
-    const renderHeaderLevel = (headers, level = 0) => {
+const renderHeaderLevel = (headers: Header[], level = 0) => {
       return (
         <tr>
           {level === 0 && (
@@ -428,7 +392,7 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
               {rowColumns.length > 0 ? rowColumns.map((col) => col.name).join(" / ") : "Datos"}
             </th>
           )}
-          {headers.map((header, index) => (
+{headers.map((header: Header, index: number) => (
             <th
               key={`${level}_${index}`}
               colSpan={header.colSpan}
@@ -447,12 +411,12 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
       )
     }
 
-    const getAllLevels = (headers, currentLevel = 0, allLevels = []) => {
+const getAllLevels = (headers: Header[], currentLevel = 0, allLevels: Header[][] = []) => {
       if (!allLevels[currentLevel]) {
-        allLevels[currentLevel] = []
+allLevels[currentLevel] = [] as Header[]
       }
 
-      headers.forEach((header) => {
+headers.forEach((header: Header) => {
         allLevels[currentLevel].push(header)
         if (header.children && header.children.length > 0) {
           getAllLevels(header.children, currentLevel + 1, allLevels)
@@ -534,8 +498,8 @@ export function PivotTable({ data, rowColumns, colColumns, valueColumns }: Pivot
                           </div>
                         </td>
 
-                        {columnGroups.map((colGroup) =>
-                          colGroup.children.map((col) => {
+{columnGroups.map((colGroup) =>
+                          colGroup.children.map((col: ColumnGroup["children"][number]) => {
                             const value = rowData.data[col.accessor] || 0
                             const cellClass = isSubtotal
                               ? "text-right font-mono font-bold"

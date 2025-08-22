@@ -2,12 +2,13 @@
 
 import { useState } from "react"
 import { FilterHeader } from "./filter-header"
-import { ColumnSelector, type Column } from "./column-selector"
+import { ColumnSelector } from "./column-selector"
 import { ColumnFilters } from "./column-filters"
+import type { Column } from "@/interfaces/column"
 import { PivotTable } from "./pivot-table"
 import { ChartVisualization } from "./chart-visualization"
 
-const sampleData = [
+const sampleData: Record<string, any>[] = [
   {
     id: 1,
     cod_form: "302",
@@ -89,24 +90,41 @@ const sampleData = [
     totalg: 3,
   },
 ]
-
 const availableColumns: Column[] = [
-  { id: "sedes", name: "Departamento", type: "dimension" },
-  { id: "provincia", name: "Provincia", type: "dimension" },
-  { id: "municipio", name: "Municipio", type: "dimension" },
-  { id: "establecimiento", name: "Establecimiento", type: "dimension" },
-  { id: "formulario", name: "Formulario", type: "dimension" },
-  { id: "variable", name: "Variable", type: "dimension" },
-  { id: "subvariable", name: "Subvariable", type: "dimension" },
+  { id: "cod_form", name: "Código de Formulario", type: "dimension" },
+  { id: "cod_grup", name: "Código de Grupo", type: "dimension" },
   { id: "gestion", name: "Gestión", type: "dimension" },
   { id: "mes", name: "Mes", type: "dimension" },
+  { id: "sem", name: "Semana", type: "dimension" },
+  { id: "cod_depto", name: "Código de Departamento", type: "dimension" },
+  { id: "sedes", name: "Sedes/Departamento", type: "dimension" },
+  { id: "provincia", name: "Provincia", type: "dimension" },
+  { id: "cod_area", name: "Código de Área", type: "dimension" },
+  { id: "red_establ", name: "Red de Establecimiento", type: "dimension" },
+  { id: "codmuni", name: "Código de Municipio", type: "dimension" },
+  { id: "municipio", name: "Municipio", type: "dimension" },
+  { id: "corr_establ", name: "Correlativo Establecimiento", type: "dimension" },
+  { id: "estado_est", name: "Estado del Establecimiento", type: "dimension" },
+  { id: "establecimiento", name: "Establecimiento", type: "dimension" },
+  { id: "ambito", name: "Ámbito", type: "dimension" },
+  { id: "nivel", name: "Nivel", type: "dimension" },
+  { id: "tipo", name: "Tipo", type: "dimension" },
+  { id: "institucion", name: "Institución", type: "dimension" },
+  { id: "subsector", name: "Subsector", type: "dimension" },
+  { id: "codvariable", name: "Código de Variable", type: "dimension" },
+  { id: "codvariable1", name: "Código de Variable 1", type: "dimension" },
+  { id: "formulario", name: "Formulario", type: "dimension" },
+  { id: "grupo", name: "Grupo", type: "dimension" },
+  { id: "orden", name: "Orden", type: "dimension" },
+  { id: "variable", name: "Variable", type: "dimension" },
+  { id: "subvariable", name: "Subvariable", type: "dimension" },
   { id: "totalv", name: "Total Varones", type: "measure" },
   { id: "totalm", name: "Total Mujeres", type: "measure" },
   { id: "totalg", name: "Total General", type: "measure" },
-]
+];
 
 export function DynamicPivotTable() {
-  const [currentData, setCurrentData] = useState(sampleData)
+const [currentData] = useState(sampleData)
   const [filteredData, setFilteredData] = useState(sampleData)
   const [rowColumns, setRowColumns] = useState<Column[]>([availableColumns[0]]) // Departamento
   const [colColumns, setColColumns] = useState<Column[]>([availableColumns[4]]) // Formulario

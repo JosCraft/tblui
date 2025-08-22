@@ -6,20 +6,8 @@ import { Button } from "@/components/ui/button"
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
 import { RotateCcw } from "lucide-react"
 
-export type Column = {
-  id: string
-  name: string
-  type: "dimension" | "measure"
-}
-
-interface ColumnSelectorProps {
-  availableColumns: Column[]
-  rowColumns: Column[]
-  colColumns: Column[]
-  valueColumns: Column[]
-  onColumnsChange: (type: string, columns: Column[]) => void
-  onReset: () => void
-}
+import type { Column } from "@/interfaces/column"
+import type { ColumnSelectorProps } from "@/interfaces/column-selector"
 
 export function ColumnSelector({
   availableColumns,
